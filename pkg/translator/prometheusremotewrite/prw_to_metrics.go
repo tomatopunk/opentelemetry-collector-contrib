@@ -6,13 +6,11 @@ package prometheusremotewrite // import "github.com/open-telemetry/opentelemetry
 import (
 	"errors"
 	"fmt"
-	writev2 "github.com/prometheus/prometheus/prompb/io/prometheus/write/v2"
-	"regexp"
-	"time"
-
 	"github.com/prometheus/prometheus/prompb"
+	writev2 "github.com/prometheus/prometheus/prompb/io/prometheus/write/v2"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.uber.org/zap"
+	"regexp"
 )
 
 var (
@@ -104,10 +102,6 @@ func getMetricTypeAndUnit(metricName string) (string, string) {
 		}
 	}
 	return "", ""
-}
-
-func isOlderThanThreshold(timestamp time.Time, threshold int64) bool {
-	return timestamp.Before(time.Now().Add(-time.Duration(threshold) * time.Hour))
 }
 
 // addDataPointToMetric adds a data point to a given metric. This function is designed
@@ -208,12 +202,12 @@ func FromTimeSeriesV2(req *writev2.Request, settings PRWToMetricSettings) (pmetr
 
 		switch ts.Metadata.Type {
 		case writev2.Metadata_METRIC_TYPE_HISTOGRAM:
-			prwHistogramConvert(ts, metric, symbol, settings)
+			prwHistogramConvert(ts, &metric, symbol, settings)
 		case writev2.Metadata_METRIC_TYPE_SUMMARY, writev2.Metadata_METRIC_TYPE_INFO, writev2.Metadata_METRIC_TYPE_STATESET:
 			// todo summary is monotonic, info, stateset not monotonic
 			// need more information, summary maybe count, sum or quantile values, check sum suffix
 		default:
-			prwGaugeConvert(ts, metric, symbol, settings)
+			prwGaugeConvert(ts, &metric, symbol, settings)
 			settings.Logger.Debug("Unsupported metric type", zap.String("metric_name", metricName), zap.String("type", ts.Metadata.Type.String()))
 		}
 	}
@@ -221,7 +215,7 @@ func FromTimeSeriesV2(req *writev2.Request, settings PRWToMetricSettings) (pmetr
 	return metrics, nil
 }
 
-func prwHistogramConvert(ts writev2.TimeSeries, metric pmetric.Metric, symbols []string, settings PRWToMetricSettings) {
+func prwHistogramConvert(ts writev2.TimeSeries, metric *pmetric.Metric, symbols []string, settings PRWToMetricSettings) {
 	histogramMetric := metric.SetEmptyHistogram()
 	//todo use: metric.SetEmptyExponentialHistogram()
 	histogramMetric.SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
@@ -328,19 +322,18 @@ func histogramCount(histogram writev2.Histogram) uint64 {
 	return bucketCount
 }
 
-func prwGaugeConvert(ts writev2.TimeSeries, metric pmetric.Metric, symbol []string, settings PRWToMetricSettings) {
+func prwGaugeConvert(ts writev2.TimeSeries, metric *pmetric.Metric, symbol []string, settings PRWToMetricSettings) {
+	gauge := metric.SetEmptyGauge()
 	for _, sample := range ts.Samples {
 		dataPoint := pmetric.NewNumberDataPoint()
-		dataPoint.SetDoubleValue(sample.Value)
-
 		if SetDataPointTimestamp(dataPoint, sample.Timestamp, settings) {
 			settings.Logger.Debug("Metric older than the threshold", zap.String("metric_name", metric.Name()), zap.Time("metric_timestamp", dataPoint.Timestamp().AsTime()))
 			continue
 		}
 
+		dataPoint.SetDoubleValue(sample.Value)
 		addLabelsToDataPointV2(dataPoint, ts.LabelsRefs, symbol)
-		metric.SetEmptyGauge()
-		dataPoint.CopyTo(metric.Gauge().DataPoints().AppendEmpty())
+		dataPoint.CopyTo(gauge.DataPoints().AppendEmpty())
 	}
 }
 

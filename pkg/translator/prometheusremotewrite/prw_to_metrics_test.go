@@ -5,6 +5,7 @@ package prometheusremotewrite
 
 import (
 	"fmt"
+	writev2 "github.com/prometheus/prometheus/prompb/io/prometheus/write/v2"
 	"testing"
 	"time"
 
@@ -410,4 +411,71 @@ func getMetrics(metric pmetric.Metric) pmetric.Metrics {
 	pm.MoveTo(empty)
 	metric.MoveTo(empty)
 	return metrics
+}
+
+var defaultSetting = PRWToMetricSettings{
+	Logger:        *zap.NewNop(),
+	TimeThreshold: 2,
+}
+
+func TestPrwGaugeConvert(t *testing.T) {
+	settings := defaultSetting
+
+	tests := []struct {
+		name           string
+		ts             writev2.TimeSeries
+		metric         pmetric.Metric
+		symbol         []string
+		expected       []float64
+		expectedLabels map[string]string
+	}{
+		{
+			name: "Basic conversion",
+			ts: writev2.TimeSeries{
+				Samples: []writev2.Sample{
+					{Value: 1.23, Timestamp: nowMillis},
+					{Value: 4.56, Timestamp: nowMillis},
+				},
+				LabelsRefs: []uint32{1, 2, 3, 4},
+			},
+			metric:         pmetric.NewMetric(),
+			symbol:         []string{"name", "label1", "value1", "label2", "value2"},
+			expected:       []float64{1.23, 4.56},
+			expectedLabels: map[string]string{"label1": "value1", "label2": "value2"},
+		},
+		{
+			name: "Metric older than threshold",
+			ts: writev2.TimeSeries{
+				Samples: []writev2.Sample{
+					{Value: 7.89, Timestamp: nowMillis},
+				},
+				LabelsRefs: []uint32{1, 2},
+			},
+			metric:         pmetric.NewMetric(),
+			symbol:         []string{"label1", "value1"},
+			expected:       []float64{},
+			expectedLabels: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prwGaugeConvert(tt.ts, &tt.metric, tt.symbol, settings)
+
+			dataPoints := tt.metric.Gauge().DataPoints()
+			assert.Equal(t, len(tt.expected), dataPoints.Len())
+
+			for i := 0; i < dataPoints.Len(); i++ {
+				dp := dataPoints.At(i)
+
+				assert.Equal(t, tt.expected[i], dp.DoubleValue())
+
+				for k, v := range tt.expectedLabels {
+					actualV, has := dp.Attributes().Get(k)
+					assert.True(t, has)
+					assert.Equal(t, v, actualV.Str())
+				}
+			}
+		})
+	}
 }

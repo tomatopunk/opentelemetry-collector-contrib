@@ -27,3 +27,7 @@ func SetDataPointTimestamp[T TimeDatapointSetter](dp T, timestamp int64, setting
 	}
 	return false // The data point is not older than the threshold.
 }
+
+func isOlderThanThreshold(timestamp time.Time, threshold int64) bool {
+	return timestamp.Before(time.Now().Add(-time.Duration(threshold) * time.Hour))
+}
