@@ -203,19 +203,18 @@ func FromTimeSeriesV2(req *writev2.Request, settings PRWToMetricSettings) (pmetr
 		}
 		metric.SetName(metricName)
 		metric.SetUnit(req.Symbols[ts.Metadata.UnitRef])
+		metric.SetDescription(req.Symbols[ts.Metadata.HelpRef])
+		metric.Metadata().PutStr("prometheus_type", ts.Metadata.Type.String())
 
-		// value and label
 		switch ts.Metadata.Type {
-		case writev2.Metadata_METRIC_TYPE_GAUGE:
-			prwGaugeConvert(ts, metric, symbol, settings)
 		case writev2.Metadata_METRIC_TYPE_HISTOGRAM:
 			prwHistogramConvert(ts, metric, symbol, settings)
-		case writev2.Metadata_METRIC_TYPE_GAUGEHISTOGRAM:
-		case writev2.Metadata_METRIC_TYPE_SUMMARY:
-		case writev2.Metadata_METRIC_TYPE_INFO:
-		case writev2.Metadata_METRIC_TYPE_STATESET:
+		case writev2.Metadata_METRIC_TYPE_SUMMARY, writev2.Metadata_METRIC_TYPE_INFO, writev2.Metadata_METRIC_TYPE_STATESET:
+			// todo summary is monotonic, info, stateset not monotonic
+			// need more information, summary maybe count, sum or quantile values, check sum suffix
 		default:
-			settings.Logger.Warn("Unsupported metric type", zap.String("metric_name", ts.Metadata.Type.String()))
+			prwGaugeConvert(ts, metric, symbol, settings)
+			settings.Logger.Debug("Unsupported metric type", zap.String("metric_name", metricName), zap.String("type", ts.Metadata.Type.String()))
 		}
 	}
 
@@ -223,12 +222,8 @@ func FromTimeSeriesV2(req *writev2.Request, settings PRWToMetricSettings) (pmetr
 }
 
 func prwHistogramConvert(ts writev2.TimeSeries, metric pmetric.Metric, symbols []string, settings PRWToMetricSettings) {
-	//histogramMetric := metric.SetEmptyExponentialHistogram()
 	histogramMetric := metric.SetEmptyHistogram()
-	//if ts.Histograms[0].Schema != -53 {
-	//	histogramMetric = metric.SetEmptyExponentialHistogram()
-	//}
-
+	//todo use: metric.SetEmptyExponentialHistogram()
 	histogramMetric.SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
 
 	for _, histogram := range ts.Histograms {
