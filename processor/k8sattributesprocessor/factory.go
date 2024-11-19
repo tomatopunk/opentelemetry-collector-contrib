@@ -15,9 +15,9 @@ import (
 	"go.opentelemetry.io/collector/processor/processorhelper/processorhelperprofiles"
 	"go.opentelemetry.io/collector/processor/processorprofiles"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/metadata"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/metadata"
 )
 
 var (

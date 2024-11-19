@@ -11,8 +11,8 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
 	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal/clientutil"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
 )
 
 // extractPodIds returns pod identifier for first association matching all sources
