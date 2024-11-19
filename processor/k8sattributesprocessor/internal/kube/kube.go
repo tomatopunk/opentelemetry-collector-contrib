@@ -31,9 +31,10 @@ const (
 	MetadataFromNode       = "node"
 	PodIdentifierMaxLength = 4
 
-	ResourceSource   = "resource_attribute"
-	ConnectionSource = "connection"
-	K8sIPLabelName   = "k8s.pod.ip"
+	ResourceSource           = "resource_attribute"
+	DataPointAttributeSource = "datapoint_attribute"
+	ConnectionSource         = "connection"
+	K8sIPLabelName           = "k8s.pod.ip"
 )
 
 // PodIdentifierAttribute represents AssociationSource with matching value for pod

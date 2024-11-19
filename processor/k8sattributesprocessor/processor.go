@@ -99,7 +99,7 @@ func (kp *kubernetesprocessor) Shutdown(context.Context) error {
 func (kp *kubernetesprocessor) processTraces(ctx context.Context, td ptrace.Traces) (ptrace.Traces, error) {
 	rss := td.ResourceSpans()
 	for i := 0; i < rss.Len(); i++ {
-		kp.processResource(ctx, rss.At(i).Resource())
+		kp.processAttribute(ctx, rss.At(i).Resource().Attributes())
 	}
 
 	return td, nil
@@ -109,7 +109,46 @@ func (kp *kubernetesprocessor) processTraces(ctx context.Context, td ptrace.Trac
 func (kp *kubernetesprocessor) processMetrics(ctx context.Context, md pmetric.Metrics) (pmetric.Metrics, error) {
 	rm := md.ResourceMetrics()
 	for i := 0; i < rm.Len(); i++ {
-		kp.processResource(ctx, rm.At(i).Resource())
+		rs := rm.At(i)
+		kp.processAttribute(ctx, rs.Resource().Attributes())
+
+		ilms := rs.ScopeMetrics()
+		for j := 0; j < ilms.Len(); j++ {
+			ils := ilms.At(j)
+
+			metrics := ils.Metrics()
+			for k := 0; k < metrics.Len(); k++ {
+				m := metrics.At(k)
+				switch m.Type() {
+				case pmetric.MetricTypeGauge:
+					dps := m.Gauge().DataPoints()
+					for i := 0; i < dps.Len(); i++ {
+						kp.processAttribute(ctx, dps.At(i).Attributes())
+					}
+				case pmetric.MetricTypeSum:
+					dps := m.Sum().DataPoints()
+					for i := 0; i < dps.Len(); i++ {
+						kp.processAttribute(ctx, dps.At(i).Attributes())
+					}
+				case pmetric.MetricTypeHistogram:
+					dps := m.Histogram().DataPoints()
+					for i := 0; i < dps.Len(); i++ {
+						kp.processAttribute(ctx, dps.At(i).Attributes())
+					}
+				case pmetric.MetricTypeExponentialHistogram:
+					dps := m.ExponentialHistogram().DataPoints()
+					for i := 0; i < dps.Len(); i++ {
+						kp.processAttribute(ctx, dps.At(i).Attributes())
+					}
+				case pmetric.MetricTypeSummary:
+					dps := m.Summary().DataPoints()
+					for i := 0; i < dps.Len(); i++ {
+						kp.processAttribute(ctx, dps.At(i).Attributes())
+					}
+				case pmetric.MetricTypeEmpty:
+				}
+			}
+		}
 	}
 
 	return md, nil
@@ -119,7 +158,7 @@ func (kp *kubernetesprocessor) processMetrics(ctx context.Context, md pmetric.Me
 func (kp *kubernetesprocessor) processLogs(ctx context.Context, ld plog.Logs) (plog.Logs, error) {
 	rl := ld.ResourceLogs()
 	for i := 0; i < rl.Len(); i++ {
-		kp.processResource(ctx, rl.At(i).Resource())
+		kp.processAttribute(ctx, rl.At(i).Resource().Attributes())
 	}
 
 	return ld, nil
@@ -129,21 +168,21 @@ func (kp *kubernetesprocessor) processLogs(ctx context.Context, ld plog.Logs) (p
 func (kp *kubernetesprocessor) processProfiles(ctx context.Context, pd pprofile.Profiles) (pprofile.Profiles, error) {
 	rp := pd.ResourceProfiles()
 	for i := 0; i < rp.Len(); i++ {
-		kp.processResource(ctx, rp.At(i).Resource())
+		kp.processAttribute(ctx, rp.At(i).Resource().Attributes())
 	}
 
 	return pd, nil
 }
 
 // processResource adds Pod metadata tags to resource based on pod association configuration
-func (kp *kubernetesprocessor) processResource(ctx context.Context, resource pcommon.Resource) {
-	podIdentifierValue := extractPodID(ctx, resource.Attributes(), kp.podAssociations)
+func (kp *kubernetesprocessor) processAttribute(ctx context.Context, attribute pcommon.Map) {
+	podIdentifierValue := extractPodID(ctx, attribute, kp.podAssociations)
 	kp.logger.Debug("evaluating pod identifier", zap.Any("value", podIdentifierValue))
 
 	for i := range podIdentifierValue {
 		if podIdentifierValue[i].Source.From == kube.ConnectionSource && podIdentifierValue[i].Value != "" {
-			if _, found := resource.Attributes().Get(kube.K8sIPLabelName); !found {
-				resource.Attributes().PutStr(kube.K8sIPLabelName, podIdentifierValue[i].Value)
+			if _, found := attribute.Get(kube.K8sIPLabelName); !found {
+				attribute.PutStr(kube.K8sIPLabelName, podIdentifierValue[i].Value)
 			}
 			break
 		}
@@ -159,36 +198,36 @@ func (kp *kubernetesprocessor) processResource(ctx context.Context, resource pco
 			kp.logger.Debug("getting the pod", zap.Any("pod", pod))
 
 			for key, val := range pod.Attributes {
-				if _, found := resource.Attributes().Get(key); !found {
-					resource.Attributes().PutStr(key, val)
+				if _, found := attribute.Get(key); !found {
+					attribute.PutStr(key, val)
 				}
 			}
-			kp.addContainerAttributes(resource.Attributes(), pod)
+			kp.addContainerAttributes(attribute, pod)
 		}
 	}
 
-	namespace := getNamespace(pod, resource.Attributes())
+	namespace := getNamespace(pod, attribute)
 	if namespace != "" {
 		attrsToAdd := kp.getAttributesForPodsNamespace(namespace)
 		for key, val := range attrsToAdd {
-			if _, found := resource.Attributes().Get(key); !found {
-				resource.Attributes().PutStr(key, val)
+			if _, found := attribute.Get(key); !found {
+				attribute.PutStr(key, val)
 			}
 		}
 	}
 
-	nodeName := getNodeName(pod, resource.Attributes())
+	nodeName := getNodeName(pod, attribute)
 	if nodeName != "" {
 		attrsToAdd := kp.getAttributesForPodsNode(nodeName)
 		for key, val := range attrsToAdd {
-			if _, found := resource.Attributes().Get(key); !found {
-				resource.Attributes().PutStr(key, val)
+			if _, found := attribute.Get(key); !found {
+				attribute.PutStr(key, val)
 			}
 		}
 		nodeUID := kp.getUIDForPodsNode(nodeName)
 		if nodeUID != "" {
-			if _, found := resource.Attributes().Get(conventions.AttributeK8SNodeUID); !found {
-				resource.Attributes().PutStr(conventions.AttributeK8SNodeUID, nodeUID)
+			if _, found := attribute.Get(conventions.AttributeK8SNodeUID); !found {
+				attribute.PutStr(conventions.AttributeK8SNodeUID, nodeUID)
 			}
 		}
 	}
