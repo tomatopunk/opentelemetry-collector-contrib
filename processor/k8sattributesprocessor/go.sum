@@ -1210,6 +1210,7 @@ github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o
 github.com/stretchr/testify v1.8.3/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal v0.41.1-0.20241119092529-501b4ae32448/go.mod h1:Zh2X189PHhb2WmZM183/AhUhs8XJfnU9JKQWBf+CIqI=
 github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig v0.41.1-0.20241119091754-bf4428491962 h1:4HcAGBVrWTPs3AVxS6VACijtZvQGFWR48nVxTUaIZNY=
 github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig v0.41.1-0.20241119091754-bf4428491962/go.mod h1:B2huRxtrLdlI6jwfOScdm1pG8w2Fc0fVYxNVZfbrVlU=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=

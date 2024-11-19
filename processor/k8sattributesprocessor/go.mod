@@ -6,11 +6,11 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
-	github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal 501b4ae3
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.114.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.114.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.114.0
 	github.com/stretchr/testify v1.9.0
+	github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal v0.41.1-0.20241119092529-501b4ae32448
 	github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig v0.41.1-0.20241119091754-bf4428491962
 	go.opentelemetry.io/collector/client v1.20.0
 	go.opentelemetry.io/collector/component v0.114.0
@@ -144,7 +144,7 @@ retract (
 	v0.65.0
 )
 
-replace github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal => ../../internal/coreinternal
+//replace github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal => ../../internal/coreinternal
 
 replace github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest => ../../internal/k8stest
 
