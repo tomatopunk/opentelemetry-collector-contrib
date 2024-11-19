@@ -26,8 +26,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/metadata"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/metadata"
 )
 
 var enableRFC3339Timestamp = featuregate.GlobalRegistry().MustRegister(
@@ -829,6 +829,19 @@ func (c *WatchClient) getIdentifiersFromAssoc(pod *Pod) []PodIdentifier {
 				if attr == "" {
 					skip = true
 					break
+				}
+				ret[i] = PodIdentifierAttributeFromSource(source, attr)
+			case source.From == DataPointAttributeSource:
+				attr := ""
+				switch source.Name {
+				case "namespace":
+					attr = pod.Namespace
+				case "pod":
+					attr = pod.Name
+				default:
+					if v, ok := pod.Attributes[source.Name]; ok {
+						attr = v
+					}
 				}
 				ret[i] = PodIdentifierAttributeFromSource(source, attr)
 			}

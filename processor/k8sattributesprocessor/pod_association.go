@@ -11,8 +11,8 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal/clientutil"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal/clientutil"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
 )
 
 // extractPodIds returns pod identifier for first association matching all sources
@@ -36,7 +36,7 @@ func extractPodID(ctx context.Context, attrs pcommon.Map, associations []kube.As
 					break
 				}
 				ret[i] = kube.PodIdentifierAttributeFromConnection(connectionIP)
-			case source.From == kube.ResourceSource:
+			case source.From == kube.ResourceSource || source.From == kube.DataPointAttributeSource:
 				// Extract values based on configured resource_attribute.
 				attributeValue := stringAttributeFromMap(attrs, source.Name)
 				if attributeValue == "" {
