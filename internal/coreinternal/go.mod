@@ -1,4 +1,4 @@
-module github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal
+module github.com/tomatopunk/opentelemetry-collector-contrib/internal/coreinternal
 
 go 1.22.0
 
