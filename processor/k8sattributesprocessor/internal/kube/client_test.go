@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig"
 )
 
 func newFakeAPIClientset(_ k8sconfig.APIConfig) (kubernetes.Interface, error) {
@@ -80,6 +80,7 @@ func podAddAndUpdateTest(t *testing.T, c *WatchClient, handler func(obj any)) {
 	pod.Name = "podC"
 	pod.Status.PodIP = "2.2.2.2"
 	pod.UID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
 	handler(pod)
 	assert.Len(t, c.Pods, 5)
 	got = c.Pods[newPodIdentifier("connection", "k8s.pod.ip", "2.2.2.2")]
@@ -198,6 +199,61 @@ func TestConstructorErrors(t *testing.T) {
 		assert.Equal(t, "error creating k8s client", err.Error())
 		assert.Equal(t, apiCfg, gotAPIConfig)
 	})
+}
+
+func TestPodAddByAttrbute(t *testing.T) {
+	c, _ := newTestClient(t)
+	c.Associations = append(c.Associations, Association{
+		Name: "name",
+		Sources: []AssociationSource{
+			{
+				From: ResourceSource,
+				Name: "k8s.pod.name",
+			},
+		},
+	}, Association{
+		Name: "pvc",
+		Sources: []AssociationSource{
+			{
+				From: DataPointAttributeSource,
+				Name: "pod",
+			},
+			{
+				From: DataPointAttributeSource,
+				Name: "namespace",
+			},
+		},
+	})
+
+	pod := &api_v1.Pod{}
+
+	pod.Name = "podC"
+	pod.Status.PodIP = "2.2.2.2"
+	pod.UID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	pod.Namespace = "namespace"
+
+	c.handlePodAdd(pod)
+
+	got := c.Pods[PodIdentifier{
+		{
+			Source: AssociationSource{
+				From: "datapoint_attribute",
+				Name: "pod",
+			},
+			Value: "podC",
+		},
+		{
+			Source: AssociationSource{
+				From: "datapoint_attribute",
+				Name: "namespace",
+			},
+			Value: "namespace",
+		},
+	}]
+	assert.NotNil(t, got)
+
+	assert.Equal(t, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", got.PodUID)
+
 }
 
 func TestPodAdd(t *testing.T) {

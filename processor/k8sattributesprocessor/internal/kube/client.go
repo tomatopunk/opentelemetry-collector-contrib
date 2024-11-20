@@ -831,6 +831,19 @@ func (c *WatchClient) getIdentifiersFromAssoc(pod *Pod) []PodIdentifier {
 					break
 				}
 				ret[i] = PodIdentifierAttributeFromSource(source, attr)
+			case source.From == DataPointAttributeSource:
+				attr := ""
+				switch source.Name {
+				case "namespace":
+					attr = pod.Namespace
+				case "pod":
+					attr = pod.Name
+				default:
+					if v, ok := pod.Attributes[source.Name]; ok {
+						attr = v
+					}
+				}
+				ret[i] = PodIdentifierAttributeFromSource(source, attr)
 			}
 		}
 
