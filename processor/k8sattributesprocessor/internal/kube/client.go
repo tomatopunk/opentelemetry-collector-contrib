@@ -562,9 +562,6 @@ func (c *WatchClient) extractPodAttributes(pod *api_v1.Pod) map[string]string {
 	}
 
 	for _, r := range c.Rules.Labels {
-		if pod.Name == "infinite-shell" {
-			c.logger.Warn("debug label", zap.Any("attribute", pod.Labels))
-		}
 		r.extractFromPodMetadata(pod.Labels, tags, "k8s.pod.labels.%s")
 	}
 
