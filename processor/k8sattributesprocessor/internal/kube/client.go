@@ -675,6 +675,14 @@ func (c *WatchClient) extractPodContainersAttributes(pod *api_v1.Pod) PodContain
 	if !needContainerAttributes(c.Rules) {
 		return containers
 	}
+
+	volumeToPVC := make(map[string]string)
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			volumeToPVC[volume.Name] = volume.PersistentVolumeClaim.ClaimName
+		}
+	}
+
 	if c.Rules.ContainerImageName || c.Rules.ContainerImageTag {
 		for _, spec := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
 			container := &Container{}
@@ -690,11 +698,16 @@ func (c *WatchClient) extractPodContainersAttributes(pod *api_v1.Pod) PodContain
 				container.ImageTag = spec.Image[nameTagSep+1:]
 			}
 			containers.ByName[spec.Name] = container
-			for _, dev := range spec.VolumeDevices {
-				containers.ByVolumeDevice[dev.Name] = container
+
+			// Populate ByVolumeDevice using volumeMounts
+			for _, mount := range spec.VolumeMounts {
+				if pvcName, exists := volumeToPVC[mount.Name]; exists {
+					containers.ByVolumeDevice[pvcName] = container
+				}
 			}
 		}
 	}
+
 	for _, apiStatus := range append(pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses...) {
 		container, ok := containers.ByName[apiStatus.Name]
 		if !ok {
