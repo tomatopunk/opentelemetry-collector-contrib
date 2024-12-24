@@ -668,8 +668,9 @@ func removeUnnecessaryPodData(pod *api_v1.Pod, rules ExtractionRules) *api_v1.Po
 
 func (c *WatchClient) extractPodContainersAttributes(pod *api_v1.Pod) PodContainers {
 	containers := PodContainers{
-		ByID:   map[string]*Container{},
-		ByName: map[string]*Container{},
+		ByID:           map[string]*Container{},
+		ByName:         map[string]*Container{},
+		ByVolumeDevice: map[string]*Container{},
 	}
 	if !needContainerAttributes(c.Rules) {
 		return containers
@@ -689,6 +690,9 @@ func (c *WatchClient) extractPodContainersAttributes(pod *api_v1.Pod) PodContain
 				container.ImageTag = spec.Image[nameTagSep+1:]
 			}
 			containers.ByName[spec.Name] = container
+			for _, dev := range spec.VolumeDevices {
+				containers.ByVolumeDevice[dev.Name] = container
+			}
 		}
 	}
 	for _, apiStatus := range append(pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses...) {
@@ -832,18 +836,22 @@ func (c *WatchClient) getIdentifiersFromAssoc(pod *Pod) []PodIdentifier {
 				}
 				ret[i] = PodIdentifierAttributeFromSource(source, attr)
 			case source.From == DataPointAttributeSource:
-				attr := ""
 				switch source.Name {
 				case "namespace":
-					attr = pod.Namespace
+					ret[i] = PodIdentifierAttributeFromSource(source, pod.Namespace)
 				case "pod":
-					attr = pod.Name
+					ret[i] = PodIdentifierAttributeFromSource(source, pod.Name)
+				case "persistentvolumeclaim":
+					for volumeDevice, _ := range pod.Containers.ByVolumeDevice {
+						ret[i] = PodIdentifierAttributeFromSource(source, volumeDevice)
+						ids = append(ids, ret)
+					}
+					continue
 				default:
 					if v, ok := pod.Attributes[source.Name]; ok {
-						attr = v
+						ret[i] = PodIdentifierAttributeFromSource(source, v)
 					}
 				}
-				ret[i] = PodIdentifierAttributeFromSource(source, attr)
 			}
 		}
 

@@ -114,7 +114,6 @@ type Pod struct {
 	Namespace   string
 	NodeName    string
 	HostNetwork bool
-
 	// Containers specifies all containers in this pod.
 	Containers PodContainers
 
@@ -126,7 +125,8 @@ type PodContainers struct {
 	// ByID specifies all containers in a pod by container ID.
 	ByID map[string]*Container
 	// ByName specifies all containers in a pod by container name (k8s.container.name).
-	ByName map[string]*Container
+	ByName         map[string]*Container
+	ByVolumeDevice map[string]*Container
 }
 
 // Container stores resource attributes for a specific container defined by k8s pod spec.
