@@ -587,6 +587,7 @@ func removeUnnecessaryPodData(pod *api_v1.Pod, rules ExtractionRules) *api_v1.Po
 		},
 		Spec: api_v1.PodSpec{
 			HostNetwork: pod.Spec.HostNetwork,
+			Volumes:     pod.Spec.Volumes,
 		},
 	}
 
@@ -633,6 +634,7 @@ func removeUnnecessaryPodData(pod *api_v1.Pod, rules ExtractionRules) *api_v1.Po
 		removeUnnecessaryContainerData := func(c api_v1.Container) api_v1.Container {
 			transformedContainer := api_v1.Container{}
 			transformedContainer.Name = c.Name // we always need the name, it's used for identification
+			transformedContainer.VolumeMounts = c.VolumeMounts
 			if rules.ContainerImageName || rules.ContainerImageTag {
 				transformedContainer.Image = c.Image
 			}
