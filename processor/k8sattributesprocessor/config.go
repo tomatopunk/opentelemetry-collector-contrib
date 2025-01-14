@@ -11,8 +11,8 @@ import (
 	"go.opentelemetry.io/collector/featuregate"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/kube"
 )
 
 var disallowFieldExtractConfigRegex = featuregate.GlobalRegistry().MustRegister(

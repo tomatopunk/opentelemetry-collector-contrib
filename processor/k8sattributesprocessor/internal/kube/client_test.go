@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig"
 )
 
 func newFakeAPIClientset(_ k8sconfig.APIConfig) (kubernetes.Interface, error) {
@@ -80,6 +80,7 @@ func podAddAndUpdateTest(t *testing.T, c *WatchClient, handler func(obj any)) {
 	pod.Name = "podC"
 	pod.Status.PodIP = "2.2.2.2"
 	pod.UID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
 	handler(pod)
 	assert.Len(t, c.Pods, 5)
 	got = c.Pods[newPodIdentifier("connection", "k8s.pod.ip", "2.2.2.2")]
@@ -196,6 +197,61 @@ func TestConstructorErrors(t *testing.T) {
 		require.EqualError(t, err, "error creating k8s client")
 		assert.Equal(t, apiCfg, gotAPIConfig)
 	})
+}
+
+func TestPodAddByAttrbute(t *testing.T) {
+	c, _ := newTestClient(t)
+	c.Associations = append(c.Associations, Association{
+		Name: "name",
+		Sources: []AssociationSource{
+			{
+				From: ResourceSource,
+				Name: "k8s.pod.name",
+			},
+		},
+	}, Association{
+		Name: "pvc",
+		Sources: []AssociationSource{
+			{
+				From: DataPointAttributeSource,
+				Name: "pod",
+			},
+			{
+				From: DataPointAttributeSource,
+				Name: "namespace",
+			},
+		},
+	})
+
+	pod := &api_v1.Pod{}
+
+	pod.Name = "podC"
+	pod.Status.PodIP = "2.2.2.2"
+	pod.UID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	pod.Namespace = "namespace"
+
+	c.handlePodAdd(pod)
+
+	got := c.Pods[PodIdentifier{
+		{
+			Source: AssociationSource{
+				From: "datapoint_attribute",
+				Name: "pod",
+			},
+			Value: "podC",
+		},
+		{
+			Source: AssociationSource{
+				From: "datapoint_attribute",
+				Name: "namespace",
+			},
+			Value: "namespace",
+		},
+	}]
+	assert.NotNil(t, got)
+
+	assert.Equal(t, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", got.PodUID)
+
 }
 
 func TestPodAdd(t *testing.T) {
@@ -2010,6 +2066,98 @@ func TestWaitForMetadata(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetIdentifiersFromAssoc(t *testing.T) {
+	tests := []struct {
+		name                string
+		pod                 *Pod
+		associations        []Association
+		expectedIdentifiers [][]string
+	}{
+		{
+			name: "Basic Pod with Namespace and Pod Name",
+			pod: &Pod{
+				Namespace:  "default",
+				Name:       "test-pod",
+				PodUID:     "12345",
+				Address:    "192.168.1.1",
+				Containers: PodContainers{},
+				Attributes: map[string]string{
+					"custom-attr": "value",
+				},
+			},
+			associations: []Association{
+				{
+					Sources: []AssociationSource{
+						{From: DataPointAttributeSource, Name: "namespace"},
+						{From: DataPointAttributeSource, Name: "pod"},
+					},
+				},
+			},
+			expectedIdentifiers: [][]string{
+				[]string{"default", "test-pod", "", ""}, //point source
+				[]string{"12345", "", "", ""},           // pod id
+				[]string{"192.168.1.1", "", "", ""},     //connect
+				[]string{"192.168.1.1", "", "", ""},     //hostip
+			},
+		},
+		{
+			name: "pvc",
+			pod: &Pod{
+				Namespace: "default",
+				Name:      "test-pod",
+				PodUID:    "12345",
+				Address:   "192.168.1.1",
+				Containers: PodContainers{
+					ByVolumeDevice: map[string]*Container{
+						"111": nil,
+						"222": nil,
+					},
+				},
+				Attributes: map[string]string{
+					"custom-attr": "value",
+				},
+			},
+			associations: []Association{
+				{
+					Sources: []AssociationSource{
+						{From: DataPointAttributeSource, Name: "namespace"},
+						{From: DataPointAttributeSource, Name: "persistentvolumeclaim"},
+					},
+				},
+			},
+			expectedIdentifiers: [][]string{
+				[]string{"default", "111", "", ""},
+				[]string{"default", "111", "", ""},
+				[]string{"default", "222", "", ""},
+				[]string{"12345", "", "", ""},       // pod id
+				[]string{"192.168.1.1", "", "", ""}, //connect
+				[]string{"192.168.1.1", "", "", ""}, //hostip
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &WatchClient{
+				Associations: tt.associations,
+			}
+
+			ids := client.getIdentifiersFromAssoc(tt.pod)
+
+			if len(ids) != len(tt.expectedIdentifiers) {
+				t.Fatalf("expected %d identifiers, got %d", len(tt.expectedIdentifiers), len(ids))
+			}
+
+			for i, id := range ids {
+				require.Equal(t, tt.expectedIdentifiers[i][0], id[0].Value)
+				require.Equal(t, tt.expectedIdentifiers[i][1], id[1].Value)
+				require.Equal(t, tt.expectedIdentifiers[i][2], id[2].Value)
+				require.Equal(t, tt.expectedIdentifiers[i][3], id[3].Value)
 			}
 		})
 	}

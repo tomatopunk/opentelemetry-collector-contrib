@@ -26,8 +26,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/metadata"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/processor/k8sattributesprocessor/internal/metadata"
 )
 
 var enableRFC3339Timestamp = featuregate.GlobalRegistry().MustRegister(
@@ -590,6 +590,7 @@ func removeUnnecessaryPodData(pod *api_v1.Pod, rules ExtractionRules) *api_v1.Po
 		},
 		Spec: api_v1.PodSpec{
 			HostNetwork: pod.Spec.HostNetwork,
+			Volumes:     pod.Spec.Volumes,
 		},
 	}
 
@@ -636,6 +637,7 @@ func removeUnnecessaryPodData(pod *api_v1.Pod, rules ExtractionRules) *api_v1.Po
 		removeUnnecessaryContainerData := func(c api_v1.Container) api_v1.Container {
 			transformedContainer := api_v1.Container{}
 			transformedContainer.Name = c.Name // we always need the name, it's used for identification
+			transformedContainer.VolumeMounts = c.VolumeMounts
 			if rules.ContainerImageName || rules.ContainerImageTag {
 				transformedContainer.Image = c.Image
 			}
@@ -695,12 +697,21 @@ func parseNameAndTagFromImage(image string) (name, tag string, err error) {
 
 func (c *WatchClient) extractPodContainersAttributes(pod *api_v1.Pod) PodContainers {
 	containers := PodContainers{
-		ByID:   map[string]*Container{},
-		ByName: map[string]*Container{},
+		ByID:           map[string]*Container{},
+		ByName:         map[string]*Container{},
+		ByVolumeDevice: map[string]*Container{},
 	}
 	if !needContainerAttributes(c.Rules) {
 		return containers
 	}
+
+	volumeToPVC := make(map[string]string)
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			volumeToPVC[volume.Name] = volume.PersistentVolumeClaim.ClaimName
+		}
+	}
+
 	if c.Rules.ContainerImageName || c.Rules.ContainerImageTag {
 		for _, spec := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
 			container := &Container{}
@@ -714,8 +725,16 @@ func (c *WatchClient) extractPodContainersAttributes(pod *api_v1.Pod) PodContain
 				}
 			}
 			containers.ByName[spec.Name] = container
+
+			// Populate ByVolumeDevice using volumeMounts
+			for _, mount := range spec.VolumeMounts {
+				if pvcName, exists := volumeToPVC[mount.Name]; exists {
+					containers.ByVolumeDevice[pvcName] = container
+				}
+			}
 		}
 	}
+
 	for _, apiStatus := range append(pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses...) {
 		container, ok := containers.ByName[apiStatus.Name]
 		if !ok {
@@ -856,6 +875,23 @@ func (c *WatchClient) getIdentifiersFromAssoc(pod *Pod) []PodIdentifier {
 					break
 				}
 				ret[i] = PodIdentifierAttributeFromSource(source, attr)
+			case source.From == DataPointAttributeSource:
+				switch source.Name {
+				case "namespace":
+					ret[i] = PodIdentifierAttributeFromSource(source, pod.Namespace)
+				case "pod":
+					ret[i] = PodIdentifierAttributeFromSource(source, pod.Name)
+				case "persistentvolumeclaim":
+					for volumeDevice, _ := range pod.Containers.ByVolumeDevice {
+						ret[i] = PodIdentifierAttributeFromSource(source, volumeDevice)
+						ids = append(ids, ret)
+					}
+					continue
+				default:
+					if v, ok := pod.Attributes[source.Name]; ok {
+						ret[i] = PodIdentifierAttributeFromSource(source, v)
+					}
+				}
 			}
 		}
 

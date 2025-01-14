@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
+	"github.com/tomatopunk/opentelemetry-collector-contrib/internal/k8sconfig"
 )
 
 const (
@@ -31,9 +31,10 @@ const (
 	MetadataFromNode       = "node"
 	PodIdentifierMaxLength = 4
 
-	ResourceSource   = "resource_attribute"
-	ConnectionSource = "connection"
-	K8sIPLabelName   = "k8s.pod.ip"
+	ResourceSource           = "resource_attribute"
+	DataPointAttributeSource = "datapoint_attribute"
+	ConnectionSource         = "connection"
+	K8sIPLabelName           = "k8s.pod.ip"
 )
 
 // PodIdentifierAttribute represents AssociationSource with matching value for pod
@@ -113,7 +114,6 @@ type Pod struct {
 	Namespace   string
 	NodeName    string
 	HostNetwork bool
-
 	// Containers specifies all containers in this pod.
 	Containers PodContainers
 
@@ -125,7 +125,8 @@ type PodContainers struct {
 	// ByID specifies all containers in a pod by container ID.
 	ByID map[string]*Container
 	// ByName specifies all containers in a pod by container name (k8s.container.name).
-	ByName map[string]*Container
+	ByName         map[string]*Container
+	ByVolumeDevice map[string]*Container
 }
 
 // Container stores resource attributes for a specific container defined by k8s pod spec.
